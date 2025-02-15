@@ -1,12 +1,14 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import requests
 from flask_httpauth import HTTPBasicAuth
 from flask_cors import CORS
 import logging
+import os
 
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24)
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 auth = HTTPBasicAuth()
 
@@ -101,9 +103,32 @@ def control_torrent():
 
     return jsonify({"success": False, "error": "Failed to fetch token"}), 500
 
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    """Login Page"""
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if username == VALID_USERNAME and password == VALID_PASSWORD:
+            session['authenticated'] = True
+            return redirect(url_for('dashboard'))
+        else:
+            return render_template('login.html', error="Invalid username or password")
+
+    return render_template('login.html')
+
 @app.route('/dashboard')
 def dashboard():
+    if not session.get('authenticated'):
+        return redirect(url_for('login'))
+    
     return render_template('torrents.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('authenticated', None)
+    return redirect(url_for('login'))
 
 @app.route('/api/torrents')
 def get_torrents():
